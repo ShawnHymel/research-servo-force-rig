@@ -1,5 +1,5 @@
 /**
- * Servo Force Test
+ * Servo and Sensor Control
  *
  * Designed for the SparkFun SAM21G Mini Breakout
  * 
@@ -62,6 +62,25 @@ static const int SRV_POT_PIN = A2;  // Blue wire
 
 // Communication constants
 static const unsigned int BAUD_RATE = 921600;
+static const unsigned int MSG_SIZE = 64;
+
+// Comma-separated message values
+// [start pos], [wait time (ms)], [end pos], [num readings], [enable force reading]
+static const unsigned int NUM_MSG_VALUES = 5;
+static const unsigned char MSG_DELIMITER = ',';
+
+// Array constants
+static const unsigned int LOG_BUF_WIDTH = 7;
+static const unsigned int LOG_BUF_LENGTH = 300;
+static const char HEADER[LOG_BUF_WIDTH][20] = {
+  "Timestamp",
+  "Desired Position",
+  "Servo Current",
+  "Servo Voltage",
+  "Servo Potentiometer",
+  "Encoder",
+  "Force"
+};
 
 // Encoder constants
 static const int ENC_STEPS_PER_ROTATION = 1200;
@@ -69,8 +88,6 @@ static const float ENC_START_DEG = 0.0;
 
 // Servo constants
 static const int SRV_OFFSET = 75;
-static const int SRV_START = 0;
-static const int SRV_END = 90;
 
 // Load cell amplifier calibration factor (get load in grams)
 // Obtained by running SparkFun_HX711_Calibration sketch
@@ -86,6 +103,7 @@ static RotaryEncoder *encoder = nullptr;
 static Servo servo;
 static HX711 lca;
 static Adafruit_INA219 ina219;
+static float log_buf[LOG_BUF_LENGTH][LOG_BUF_WIDTH];
 
 /******************************************************************************
  * Interrupt service routines (ISRs)
@@ -118,6 +136,53 @@ float get_encoder_angle() {
   return deg;
 }
 
+// Parse comma-separated floats
+// Warning: str is modified during processing
+int parse_floats(
+  float *out_array, 
+  char *str, 
+  const char delimiter, 
+  int num
+) {
+  
+  char buf[MSG_SIZE];
+  char *ptr;
+  char *ptr_end;
+  char *token;
+  int count = 0;
+  double temp;
+
+  // Make sure pointers are not null
+  if (out_array == NULL || str == NULL) {
+    return -1;
+  }
+
+  // Copy input to local buffer
+  // strcpy(buf, str);
+
+  // Get first token
+  token = strtok_r(str, &delimiter, &ptr);
+
+  // Go through all tokens
+  while (token != NULL && count < num) {
+
+    // Convert token to float
+    temp = strtod(token, &ptr_end);
+    if (token == ptr_end) {
+      return -1;
+    }
+
+    // Save value and increment counter
+    out_array[count] = (float)temp;
+    count++;
+
+    // Get next token
+    token = strtok_r(NULL, &delimiter, &ptr);
+  }
+
+  return count;
+}
+
 /******************************************************************************
  * Main
  */
@@ -139,7 +204,7 @@ void setup() {
 
   // Configure servo and set to start position
   servo.attach(SRV_PIN);
-  servo.write(SRV_START + SRV_OFFSET);
+  servo.write(SRV_OFFSET);
   delay(2000);
 
   // Configure encoder and set current position as 0
@@ -170,28 +235,77 @@ void setup() {
 
 void loop() {
 
+  unsigned long timestamp;
   float enc_val;
   float lca_val;
   float srv_vcc_voltage;
   float srv_pot_voltage;
   float current_ma;
+  unsigned int idx = 0;
+  String msg_str;
+  char msg[MSG_SIZE];
+  int num_parsed;
+  float msg_values[NUM_MSG_VALUES];
+  float pos_start;
+  unsigned int pos_wait_ms;
+  float pos_end;
+  unsigned int num_readings;
+  bool enable_force_reading;
+
+  // Parse parameters from serial
+  if (SerialUSB.available() > 0) {
+
+    // Capture line from serial and convert to char array
+    msg_str = SerialUSB.readStringUntil('\n');
+    msg_str.toCharArray(msg, MSG_SIZE);
+    
+    // Parse numbers
+    num_parsed = parse_floats(msg_values, msg, MSG_DELIMITER, NUM_MSG_VALUES);
+
+  } else {
+    return;
+  }
+
+  if (num_parsed != NUM_MSG_VALUES) {
+    SerialUSB.println("ERROR: Could not parse input message.");
+    return;
+  }
+
+  // Save the parsed values
+  pos_start = msg_values[0];
+  pos_wait_ms = (unsigned int)(msg_values[1] + 0.5);
+  pos_end = msg_values[2];
+  num_readings = (unsigned int)(msg_values[3] + 0.5);
+  enable_force_reading = (msg_values[4] != 0);
+
+  // Debug the parsed values
+  // SerialUSB.print(pos_start);
+  // SerialUSB.print(", ");
+  // SerialUSB.print(pos_wait_ms);
+  // SerialUSB.print(", ");
+  // SerialUSB.print(pos_end);
+  // SerialUSB.print(", ");
+  // SerialUSB.println(num_readings);
 
   // Wait before next test
-  servo.write(SRV_START + SRV_OFFSET);
-  delay(2000);
+  servo.write(SRV_OFFSET + pos_start);
+  delay(pos_wait_ms);
 
   // Run test
-  for (int pos = SRV_START; pos <= SRV_END; pos += 1) {
-
-    // Set servo position
-    servo.write(pos + SRV_OFFSET);    
+  timestamp = millis();
+  servo.write(SRV_OFFSET + pos_end);
+  for (int i = 0; i < num_readings; i++) {
 
     // Get encoder value, convert to -/+180 deg from servo start position
     enc_val = 360.0 - get_encoder_angle();
     enc_val = enc_val <= 180.0 ? enc_val : enc_val - 360.0;
 
     // Get load cell amplifier value
-    lca_val = lca.get_units();
+    if (enable_force_reading) {
+      lca_val = lca.get_units();
+    } else {
+      lca_val = 0.0;
+    }
 
     // Get voltage of servo supply (apply voltage divider)
     srv_vcc_voltage = analogRead(SRV_VCC_PIN) * AIN_REF / AIN_MAX;
@@ -204,17 +318,41 @@ void loop() {
     // Get supply current to servo
     current_ma = ina219.getCurrent_mA();
 
-    // Print values
-    SerialUSB.print(pos);
-    SerialUSB.print(", ");
-    SerialUSB.print(enc_val, 2);
-    SerialUSB.print(", ");
-    SerialUSB.print(lca_val, 2);
-    SerialUSB.print(", ");
-    SerialUSB.print(srv_vcc_voltage);
-    SerialUSB.print(", ");
-    SerialUSB.print(srv_pot_voltage);
-    SerialUSB.print(", ");
-    SerialUSB.println(current_ma);
+    // Store readings in log buffer
+    log_buf[idx][0] = (float)(millis() - timestamp);
+    log_buf[idx][1] =pos_end;
+    log_buf[idx][2] = current_ma;
+    log_buf[idx][3] = srv_vcc_voltage;
+    log_buf[idx][4] = srv_pot_voltage;
+    log_buf[idx][5] = enc_val;
+    log_buf[idx][6] = lca_val;
+
+    // Increase index
+    idx++;
+    if (idx >= LOG_BUF_LENGTH) {
+      idx = LOG_BUF_LENGTH - 1;
+    }
   }
+
+  // Print header
+  for (int i = 0; i < LOG_BUF_WIDTH; i++) {
+    SerialUSB.print(HEADER[i]);
+    if (i < LOG_BUF_WIDTH - 1) {
+      SerialUSB.print(", ");
+    }
+  }
+  SerialUSB.println();
+
+  // Print values
+  for (int i = 0; i < idx; i++) {
+    for (int j = 0; j < LOG_BUF_WIDTH; j++) {
+      SerialUSB.print(log_buf[i][j]);
+      if (j < LOG_BUF_WIDTH - 1) {
+        SerialUSB.print(", ");
+      } else {
+        SerialUSB.println();
+      }
+    }
+  }
+  SerialUSB.println();
 }
