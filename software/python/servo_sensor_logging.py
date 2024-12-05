@@ -8,7 +8,7 @@ SERIAL_PORT = "COM9"
 BAUD_RATE = 912600
 INITIAL_TIMEOUT = 10.0
 TIMEOUT = 1.0
-DATA_PATH = "data"
+DATA_PATH = "data/no_force"
 DATA_PREFIX = "log"
 
 #-------------------------------------------------------------------------------
@@ -55,10 +55,13 @@ def run_test(
     # Wait for the response
     resp = read_serial_data(ser, INITIAL_TIMEOUT, TIMEOUT)
 
+    # Create CSV file name: prefix_startpos_endpos_[index].csv
+    csv_filename = f"{DATA_PREFIX}_{start_pos}_{end_pos}"
+
     # Create the output CSV file, increasing the index if necessary
     index = 0
     while True:
-        csv_path = os.path.join(DATA_PATH, f"{DATA_PREFIX}_{index}.csv")
+        csv_path = os.path.join(DATA_PATH, f"{csv_filename}_{index}.csv")
         if not os.path.exists(csv_path):
             break
         index += 1
