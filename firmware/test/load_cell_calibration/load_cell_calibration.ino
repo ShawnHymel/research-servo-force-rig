@@ -38,42 +38,52 @@
 
 HX711 scale;
 
-float calibration_factor = 80.0;
+// Settings
+float calibration_factor = 8.61;  // 84.3 for grams, 8.61 for millinewtons
+unsigned int avg_num = 20;
+float cal_step = 0.01;
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println("HX711 calibration sketch");
-  Serial.println("Remove all weight from scale");
-  Serial.println("After readings begin, place known weight on scale");
-  Serial.println("Press + or a to increase calibration factor");
-  Serial.println("Press - or z to decrease calibration factor");
+  SerialUSB.begin(115200);
+  SerialUSB.println("HX711 calibration sketch");
+  SerialUSB.println("Remove all weight from scale");
+  SerialUSB.println("After readings begin, place known weight on scale");
+  SerialUSB.println("Press + or a to increase calibration factor");
+  SerialUSB.println("Press - or z to decrease calibration factor");
 
   scale.begin(DOUT, CLK);
   scale.set_scale();
   scale.tare(); //Reset the scale to 0
 
   long zero_factor = scale.read_average(); //Get a baseline reading
-  Serial.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
-  Serial.println(zero_factor);
+  SerialUSB.print("Zero factor: "); //This can be used to remove the need to tare the scale. Useful in permanent scale projects.
+  SerialUSB.println(zero_factor);
 }
 
 void loop() {
 
+  float val = 0;
+
   scale.set_scale(calibration_factor); //Adjust to this calibration factor
 
-  Serial.print("Reading: ");
-  Serial.print(scale.get_units(), 1);
-  Serial.print(" g"); 
-  Serial.print(" calibration_factor: ");
-  Serial.print(calibration_factor);
-  Serial.println();
+  // Get average of several readings
+  for (int i = 0; i < avg_num; i++) {
+    val += scale.get_units();
+  }
+  val /= avg_num;
 
-  if(Serial.available())
+  SerialUSB.print("Reading: ");
+  SerialUSB.print(val, 1);
+  SerialUSB.print(" calibration_factor: ");
+  SerialUSB.print(calibration_factor);
+  SerialUSB.println();
+
+  if(SerialUSB.available())
   {
-    char temp = Serial.read();
+    char temp = SerialUSB.read();
     if(temp == '+' || temp == 'a')
-      calibration_factor += 10;
+      calibration_factor += cal_step;
     else if(temp == '-' || temp == 'z')
-      calibration_factor -= 10;
+      calibration_factor -= cal_step;
   }
 }

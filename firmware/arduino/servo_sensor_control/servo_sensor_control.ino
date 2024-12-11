@@ -37,6 +37,9 @@
  *  https://github.com/mathertel/RotaryEncoder
  *  https://github.com/bogde/HX711
  *  https://github.com/adafruit/Adafruit_INA219
+ * 
+ * Run firmware/test/load_cell_calibration.ino to find calibration factor.
+ * This sketch assumes force sensor units are given in millinewtons (mN).
  */
 
 #include <Servo.h>
@@ -87,11 +90,13 @@ static const int ENC_STEPS_PER_ROTATION = 1200;
 static const float ENC_START_DEG = 0.0;
 
 // Servo constants
-static const int SRV_OFFSET = 75;
+static const int SRV_OFFSET = 0;
+static const int SRV_START = 0;
 
-// Load cell amplifier calibration factor (get load in grams)
+// Load cell amplifier calibration factor (get load in millinewtons)
 // Obtained by running SparkFun_HX711_Calibration sketch
-static const float LCA_CALIBRATION_FACTOR = 81.40;
+static const float LCA_CALIBRATION_FACTOR = 8.61;  // 84.3 for grams, 8.61 for millinewtons
+static const String CMD_TARE = "tare";
 
 // Analog input constants
 static const uint32_t AIN_MAX = 1023;
@@ -130,7 +135,7 @@ float get_encoder_angle() {
 
   // Convert to degrees
   pos = pos % ENC_STEPS_PER_ROTATION;
-  pos = pos >= 0 ? pos : pos + ENC_STEPS_PER_ROTATION;
+  // pos = pos >= 0 ? pos : pos + ENC_STEPS_PER_ROTATION; // Set to -180 to 180 deg
   deg = (float)pos * (360.0 / ENC_STEPS_PER_ROTATION);
 
   return deg;
@@ -204,7 +209,7 @@ void setup() {
 
   // Configure servo and set to start position
   servo.attach(SRV_PIN);
-  servo.write(SRV_OFFSET);
+  servo.write(SRV_START + SRV_OFFSET);
   delay(2000);
 
   // Configure encoder and set current position as 0
@@ -258,9 +263,16 @@ void loop() {
     // Capture line from serial and convert to char array
     msg_str = SerialUSB.readStringUntil('\n');
     msg_str.toCharArray(msg, MSG_SIZE);
-    
-    // Parse numbers
-    num_parsed = parse_floats(msg_values, msg, MSG_DELIMITER, NUM_MSG_VALUES);
+
+    // If "tare" is seen, zero the force sensor
+    if (msg_str.startsWith(CMD_TARE)) {
+      lca.tare();
+      return;
+
+    // Otherwise, pares the numbers
+    } else {
+      num_parsed = parse_floats(msg_values, msg, MSG_DELIMITER, NUM_MSG_VALUES);
+    }
 
   } else {
     return;

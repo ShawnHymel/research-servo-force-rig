@@ -8,8 +8,6 @@ SERIAL_PORT = "COM9"
 BAUD_RATE = 912600
 INITIAL_TIMEOUT = 10.0
 TIMEOUT = 1.0
-DATA_PATH = "data/no_force"
-DATA_PREFIX = "log"
 
 #-------------------------------------------------------------------------------
 # Functions
@@ -44,7 +42,9 @@ def run_test(
     wait_time_ms, 
     end_pos, 
     num_readings, 
-    enable_force_reading
+    enable_force_reading,
+    data_path,
+    data_prefix=""
 ):
     # Construct message
     msg = f"{start_pos}, {wait_time_ms}, {end_pos}, {num_readings}, {int(enable_force_reading)}"
@@ -56,12 +56,12 @@ def run_test(
     resp = read_serial_data(ser, INITIAL_TIMEOUT, TIMEOUT)
 
     # Create CSV file name: prefix_startpos_endpos_[index].csv
-    csv_filename = f"{DATA_PREFIX}_{start_pos}_{end_pos}"
+    csv_filename = f"{data_prefix}{start_pos}_{end_pos}"
 
     # Create the output CSV file, increasing the index if necessary
     index = 0
     while True:
-        csv_path = os.path.join(DATA_PATH, f"{csv_filename}_{index}.csv")
+        csv_path = os.path.join(data_path, f"{csv_filename}_{index}.csv")
         if not os.path.exists(csv_path):
             break
         index += 1
@@ -76,6 +76,7 @@ def run_test(
 #-------------------------------------------------------------------------------
 # Main
 
+# Run this file to test the servo sensor logging functionality
 def main():
 
     # Set up the test
@@ -84,6 +85,8 @@ def main():
     end_pos = 90
     num_readings = 200
     enable_force_reading = False
+    data_path = "data/sg90/no_force"
+    data_prefix = "log_"
 
     try:
 
@@ -97,7 +100,9 @@ def main():
                 wait_time_ms, 
                 end_pos, 
                 num_readings, 
-                enable_force_reading
+                enable_force_reading,
+                data_path,
+                data_prefix=data_prefix
             )
 
     except serial.SerialException as e:
