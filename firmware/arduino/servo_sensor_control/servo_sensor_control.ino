@@ -40,6 +40,8 @@
  * 
  * Run firmware/test/load_cell_calibration.ino to find calibration factor.
  * This sketch assumes force sensor units are given in millinewtons (mN).
+ * 
+ * License: BSD-3-Clause
  */
 
 #include <Servo.h>

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Run from main repo directory:
 #   python software/python/test_suite.py
 

@@ -1,4 +1,6 @@
 build/
 venv/
 .venv/
+.Trash-*
+.ipynb_checkpoints/
 *.FCBak

@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: BSD-3-Clause
 # Run this to set the servo to a mid point so you can connect the force sensor
 
 import serial
