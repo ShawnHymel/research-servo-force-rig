@@ -9,7 +9,7 @@ from servo_sensor_logging import run_test, read_serial_data
 
 # Test settings
 DATA_PATH = "data/sg92r/"
-DISTANCE = 100              # Distance (mm) from cross bar to front of bracket
+DISTANCE = 0              # Distance (mm) from cross bar to front of bracket
 NUM_TESTS = 100             # Number of tests to run per position pair
 POSITIONS = [[90, 180], [0, 180], [90, 0], [180, 90]]   # [start, end] positions
 WAIT_TIME_MS = 1000         # Time (ms) to wait at start position
