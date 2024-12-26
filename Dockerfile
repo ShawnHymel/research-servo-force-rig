@@ -66,7 +66,8 @@ ENV KERAS_BACKEND=${KERAS_BACKEND}
 ENTRYPOINT ["jupyter-lab", \
     "--allow-root", \
     "--ip=0.0.0.0", \
-    "--no-browser", \
+    "--browser=False", \
     "--notebook-dir=/workspace", \
-    "--NotebookApp.token=" \
+    "--NotebookApp.token=", \
+    "--ServerApp.disable_check_xsrf=True" \
 ]
