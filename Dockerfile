@@ -54,7 +54,17 @@ RUN python3 -m pip install --upgrade pip && \
         jupyterlab \
         matplotlib \
         pandas \
-        scikit-learn
+        scikit-learn \
+        xgboost \
+        m2cgen \
+        seaborn \
+        tqdm \
+        opencv-python \
+        Pillow \
+        h5py \
+        requests \
+        graphviz \
+        PyYAML
 
 # Activate the Python environment for shell sessions
 RUN echo "source ${VIRTUAL_ENV}/bin/activate" >> /root/.bashrc 
@@ -65,8 +75,8 @@ ENV KERAS_BACKEND=${KERAS_BACKEND}
 # Set jupyter-lab as the default entrypoint
 ENTRYPOINT ["jupyter-lab", \
     "--allow-root", \
+    "--no-browser", \
     "--ip=0.0.0.0", \
-    "--browser=False", \
     "--notebook-dir=/workspace", \
     "--NotebookApp.token=", \
     "--ServerApp.disable_check_xsrf=True" \
