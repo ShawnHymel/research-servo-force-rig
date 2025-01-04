@@ -1,0 +1,10 @@
+{
+    "target": "predictor",
+    "sources": [{
+            "name": "main",
+            "length": 342
+        }, {
+            "name": "quantize",
+            "length": 75
+        }]
+}
