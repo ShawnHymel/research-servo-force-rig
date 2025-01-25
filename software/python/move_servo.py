@@ -1,6 +1,15 @@
 #!/usr/bin/python
 # SPDX-License-Identifier: BSD-3-Clause
 # Run this to set the servo to a mid point so you can connect the force sensor
+#
+# Response from Arduino should be CSV values with the following columns:
+#  Timestamp - time (in ms) of reading
+#  Desired Position - position of the servo (normalized [0.0, 1.0])
+#  Servo Current - current draw of the servo (in mA)
+#  Servo Voltage - voltage of the servo (in V)
+#  Servo Potentiometer - potentiometer reading of the servo (in V)
+#  Encoder - encoder reading of the servo (in degrees)
+#  Force - force reading of the sensor (in N)
 
 import serial
 import sys
@@ -13,7 +22,12 @@ INITIAL_TIMEOUT = 10.0
 if len(sys.argv) < 2:
     print("Please provide the servo position as an argument")
     sys.exit(1)
-servo_pos = int(sys.argv[1])
+servo_pos = float(sys.argv[1])
+
+# Check to make sure servo position is within 0.0 to 1.0 (normalized)
+if servo_pos < 0 or servo_pos > 1:
+    print("Servo position must be between 0.0 and 1.0")
+    sys.exit(1)
 
 # Communication settings
 SERIAL_PORT = "COM9"

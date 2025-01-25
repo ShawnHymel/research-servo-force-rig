@@ -42,8 +42,8 @@ float get_encoder_angle() {
   dir = (int)encoder->getDirection();
 
   // Convert to degrees
-  pos = pos % ENC_STEPS_PER_ROTATION;
-  pos = pos >= 0 ? pos : pos + ENC_STEPS_PER_ROTATION;
+  // pos = pos % ENC_STEPS_PER_ROTATION;
+  // pos = pos >= 0 ? pos : pos + ENC_STEPS_PER_ROTATION;
   deg = (float)pos * (360.0 / ENC_STEPS_PER_ROTATION);
 
   return deg;
@@ -86,4 +86,5 @@ void loop() {
   // Print encoder value
   SerialUSB.println(enc_val);
 
+  delay(100);
 }

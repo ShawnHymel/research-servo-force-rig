@@ -40,7 +40,17 @@
  * 
  * Run firmware/test/load_cell_calibration.ino to find calibration factor.
  * This sketch assumes force sensor units are given in millinewtons (mN).
- * 
+ *
+ * Message format (CSV):
+ *  (float) POS_START - Normalized servo start position [0.0, 1.0]
+ *  (uint) WAIT_MS - Number of milliseconds to wait at start position
+ *  (float) POS_END - Normalized servo end position [0.0, 1.0]
+ *  (uint) NUM_READINGS - Number of readings during start to end movement 
+ *  (int) ENABLE_FORCE - 0 to disable force readings, 1 to enable them
+ *
+ * Response (reading) format (CSV), all floats:
+ *  timestamp - time (in ms) of reading
+ *  
  * License: BSD-3-Clause
  */
 
@@ -54,6 +64,9 @@
 /******************************************************************************
  * Constants and globals
  */
+
+// Output debugging information (in addition to CSV readings)
+#define DEBUG 0
 
 // Pin definitions
 static const int LED_PIN = LED_BUILTIN;
@@ -90,10 +103,11 @@ static const char HEADER[LOG_BUF_WIDTH][20] = {
 // Encoder constants
 static const int ENC_STEPS_PER_ROTATION = 1200;
 static const float ENC_START_DEG = 0.0;
+static const int ENC_FLIP = -1;
 
 // Servo constants
-static const int SRV_OFFSET = 0;
 static const int SRV_START = 0;
+static const float SRV_MAX = 180.0; // Arduino's servo library assumes 180 deg max for all servos
 
 // Load cell amplifier calibration factor (get load in millinewtons)
 // Obtained by running SparkFun_HX711_Calibration sketch
@@ -131,13 +145,13 @@ float get_encoder_angle() {
   int pos, dir;
   float deg = 0.0;
 
-  // Get position and direction
+  // Get position and direction (disable interrupts)
+  noInterrupts();
   pos = encoder->getPosition();
   dir = (int)encoder->getDirection();
+  interrupts();
 
   // Convert to degrees
-  pos = pos % ENC_STEPS_PER_ROTATION;
-  // pos = pos >= 0 ? pos : pos + ENC_STEPS_PER_ROTATION; // Set to -180 to 180 deg
   deg = (float)pos * (360.0 / ENC_STEPS_PER_ROTATION);
 
   return deg;
@@ -211,7 +225,7 @@ void setup() {
 
   // Configure servo and set to start position
   servo.attach(SRV_PIN);
-  servo.write(SRV_START + SRV_OFFSET);
+  servo.write(SRV_START);
   delay(2000);
 
   // Configure encoder and set current position as 0
@@ -280,6 +294,7 @@ void loop() {
     return;
   }
 
+  // Check parsed message
   if (num_parsed != NUM_MSG_VALUES) {
     SerialUSB.println("ERROR: Could not parse input message.");
     return;
@@ -293,26 +308,27 @@ void loop() {
   enable_force_reading = (msg_values[4] != 0);
 
   // Debug the parsed values
-  // SerialUSB.print(pos_start);
-  // SerialUSB.print(", ");
-  // SerialUSB.print(pos_wait_ms);
-  // SerialUSB.print(", ");
-  // SerialUSB.print(pos_end);
-  // SerialUSB.print(", ");
-  // SerialUSB.println(num_readings);
+#if DEBUG
+  SerialUSB.print(pos_start);
+  SerialUSB.print(", ");
+  SerialUSB.print(pos_wait_ms);
+  SerialUSB.print(", ");
+  SerialUSB.print(pos_end);
+  SerialUSB.print(", ");
+  SerialUSB.println(num_readings);
+#endif
 
   // Wait before next test
-  servo.write(SRV_OFFSET + pos_start);
+  servo.write(pos_start * SRV_MAX);
   delay(pos_wait_ms);
 
   // Run test
   timestamp = millis();
-  servo.write(SRV_OFFSET + pos_end);
+  servo.write(pos_end * SRV_MAX);
   for (int i = 0; i < num_readings; i++) {
 
-    // Get encoder value, convert to -/+180 deg from servo start position
-    enc_val = 360.0 - get_encoder_angle();
-    enc_val = enc_val <= 180.0 ? enc_val : enc_val - 360.0;
+    // Get encoder value and flip for being mirrored
+    enc_val = ENC_FLIP * get_encoder_angle();
 
     // Get load cell amplifier value
     if (enable_force_reading) {
@@ -334,7 +350,7 @@ void loop() {
 
     // Store readings in log buffer
     log_buf[idx][0] = (float)(millis() - timestamp);
-    log_buf[idx][1] =pos_end;
+    log_buf[idx][1] = pos_end;
     log_buf[idx][2] = current_ma;
     log_buf[idx][3] = srv_vcc_voltage;
     log_buf[idx][4] = srv_pot_voltage;

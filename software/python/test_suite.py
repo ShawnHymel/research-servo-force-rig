@@ -10,16 +10,19 @@ import time
 from servo_sensor_logging import run_test, read_serial_data
 
 # Test settings
-DATA_PATH = "data/sg92r/"
-DISTANCE = 100              # Distance (mm) from cross bar to front of bracket
-NUM_TESTS = 100             # Number of tests to run per position pair
-POSITIONS = [[90, 180], [0, 180], [90, 0], [180, 90]]   # [start, end] positions
+DATA_PATH = "data/p1s/0_deg/100mm/6_0V"
+NUM_TESTS = 50             # Number of tests to run per position pair
 WAIT_TIME_MS = 1000         # Time (ms) to wait at start position
 NUM_READINGS = 50           # Number of readings to take (let the servo cool down ~5 min between test batches!)
 ENABLE_FORCE_READING = True # False: ~2 ms per reading, True: ~12.5 ms per reading
-COOLDOWN_POSITION = 90      # Position to move to between tests
+COOLDOWN_POSITION = 0.333   # Position to move to between tests
 COOLDOWN_SEC = 2.0          # Time (sec) to wait between tests
 BATCH_COOLDOWN_SEC = 120.0  # Time (sec) to wait between test batches
+
+# Select test positions [start, end]. Comment out unused positions
+POSITIONS = [[0.0, 1.0], [0.0, 0.333], [0.333, 0.0]]  # Hook down
+# POSITIONS = [[1.0, 0.0], [0.333, 1.0], [1.0, 0.333]]  # Hook up
+# POSITIONS = [[0.333, 0.0]]  # Redo positions
 
 # Communication settings
 SERIAL_PORT = "COM9"
@@ -28,9 +31,9 @@ TIMEOUT = 1.0
 CMD_TARE = "tare"
 
 # Construct log paths
-data_prefix = f"{DISTANCE}mm_"
-if ENABLE_FORCE_READING:
-    DATA_PATH = os.path.join(DATA_PATH, "force")
+data_prefix = ""
+# if ENABLE_FORCE_READING:
+#     DATA_PATH = os.path.join(DATA_PATH, "force")
 
 try:
 
@@ -38,7 +41,8 @@ try:
     with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1) as ser:
 
         # Run tests for each position pair
-        for start_pos, end_pos in POSITIONS:
+        num_positions = len(POSITIONS)
+        for idx, (start_pos, end_pos) in enumerate(POSITIONS):
 
             # Move to initial position
             msg = f"{COOLDOWN_POSITION}, 0, {COOLDOWN_POSITION}, 0, 0"
@@ -64,13 +68,14 @@ try:
                     data_prefix=data_prefix
                 )
 
-                # Move to cooldown position
-                msg = f"{COOLDOWN_POSITION}, 0, {COOLDOWN_POSITION}, 0, 0"
-                ser.write(msg.encode())
-                time.sleep(COOLDOWN_SEC)
+                # Move to cooldown position between tests
+                if idx < num_positions - 1:
+                    msg = f"{COOLDOWN_POSITION}, 0, {COOLDOWN_POSITION}, 0, 0"
+                    ser.write(msg.encode())
+                    time.sleep(COOLDOWN_SEC)
 
-                # Flush serial buffer
-                _ = read_serial_data(ser, TIMEOUT, TIMEOUT)
+                    # Flush serial buffer
+                    _ = read_serial_data(ser, TIMEOUT, TIMEOUT)
 
         # Wait for the servo to cool down
         time.sleep(BATCH_COOLDOWN_SEC)

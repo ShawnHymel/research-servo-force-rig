@@ -66,11 +66,12 @@ static const unsigned int BAUD_RATE = 921600;
 // Encoder constants
 static const int ENC_STEPS_PER_ROTATION = 1200;
 static const float ENC_START_DEG = 0.0;
+static const int ENC_FLIP = -1;
 
 // Servo constants
-static const int SRV_OFFSET = 75;
-static const int SRV_START = 0;
-static const int SRV_END = 90;
+static const float SRV_START = 0.0;
+static const float SRV_END = 1.0;
+static const float SRV_MAX = 180.0; // Arduino's servo library assumes 180 deg max for all servos
 
 // Load cell amplifier calibration factor (get load in grams)
 // Obtained by running SparkFun_HX711_Calibration sketch
@@ -106,13 +107,15 @@ float get_encoder_angle() {
   int pos, dir;
   float deg = 0.0;
 
-  // Get position and direction
+  // Get position and direction (disable interrupts)
+  noInterrupts();
   pos = encoder->getPosition();
   dir = (int)encoder->getDirection();
+  interrupts();
 
   // Convert to degrees
-  pos = pos % ENC_STEPS_PER_ROTATION;
-  pos = pos >= 0 ? pos : pos + ENC_STEPS_PER_ROTATION;
+  // pos = pos % ENC_STEPS_PER_ROTATION;
+  // pos = pos >= 0 ? pos : pos + ENC_STEPS_PER_ROTATION;
   deg = (float)pos * (360.0 / ENC_STEPS_PER_ROTATION);
 
   return deg;
@@ -139,7 +142,7 @@ void setup() {
 
   // Configure servo and set to start position
   servo.attach(SRV_PIN);
-  servo.write(SRV_START + SRV_OFFSET);
+  servo.write(SRV_START * SRV_MAX);
   delay(2000);
 
   // Configure encoder and set current position as 0
@@ -177,18 +180,21 @@ void loop() {
   float current_ma;
 
   // Wait before next test
-  servo.write(SRV_START + SRV_OFFSET);
+  servo.write(SRV_START * SRV_MAX);
   delay(2000);
 
-  // Run test
-  for (int pos = SRV_START; pos <= SRV_END; pos += 1) {
+  // Run test (about 1 deg steps)
+  for (float pos = SRV_START; pos <= SRV_END; pos += 0.0056) {
 
     // Set servo position
-    servo.write(pos + SRV_OFFSET);    
+    servo.write(pos * SRV_MAX);    
 
-    // Get encoder value, convert to -/+180 deg from servo start position
-    enc_val = 360.0 - get_encoder_angle();
-    enc_val = enc_val <= 180.0 ? enc_val : enc_val - 360.0;
+    // Correct for encoder being mirrored
+    enc_val = ENC_FLIP * get_encoder_angle();
+
+    // OR: convert to -/+180 deg from servo start position
+    // enc_val = 360.0 - get_encoder_angle();
+    // enc_val = enc_val <= 180.0 ? enc_val : enc_val - 360.0;
 
     // Get load cell amplifier value
     lca_val = lca.get_units();
@@ -205,7 +211,7 @@ void loop() {
     current_ma = ina219.getCurrent_mA();
 
     // Print values
-    SerialUSB.print(pos);
+    SerialUSB.print(pos, 2);
     SerialUSB.print(", ");
     SerialUSB.print(enc_val, 2);
     SerialUSB.print(", ");
