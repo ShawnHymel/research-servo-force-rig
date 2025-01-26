@@ -34,9 +34,16 @@
  *    Vin+    | -       | 5 V
  * 
  * Libraries:
- *  https://github.com/mathertel/RotaryEncoder
- *  https://github.com/bogde/HX711
- *  https://github.com/adafruit/Adafruit_INA219
+ *  Encoder: https://github.com/PaulStoffregen/Encoder
+ *  INA219: https://github.com/adafruit/Adafruit_INA219
+ *  HX711: Use the included HX711_Arduino_Library_MODIFIED.zip
+ *
+ * ~~~IMPORTANT~~~
+ *  - You MUST use the modified HX711 library noted above, as it
+ *    enables interrupts during HX711 comms. This is risky, but it works with
+ *    this sketch.
+ *  - You MUST run the SparkFun_HX711_Calibration sketch first to obtain the
+ *    calibration value first. Use it to set LCA_CALIBRATION_FACTOR below.
  * 
  * Run firmware/test/load_cell_calibration.ino to find calibration factor.
  * This sketch assumes force sensor units are given in millinewtons (mN).
@@ -58,7 +65,7 @@
 #include <Wire.h>
 
 #include "HX711.h"
-#include "RotaryEncoder.h"
+#include "Encoder.h"
 #include "Adafruit_INA219.h"
 
 /******************************************************************************
@@ -70,8 +77,8 @@
 
 // Pin definitions
 static const int LED_PIN = LED_BUILTIN;
-static const int ENC_A_PIN = 8;     // Green wire
-static const int ENC_B_PIN = 9;     // White wire
+static constexpr int ENC_A_PIN = 8; // Green wire
+static constexpr int ENC_B_PIN = 9; // White wire
 static const int SRV_PIN = 6;       // Servo signal
 static const int LCA_DOUT_PIN = 3;  // Yellow wire
 static const int LCA_CLK_PIN = 4;   // Green wire
@@ -101,9 +108,9 @@ static const char HEADER[LOG_BUF_WIDTH][20] = {
 };
 
 // Encoder constants
-static const int ENC_STEPS_PER_ROTATION = 1200;
+static const int ENC_STEPS_PER_ROTATION = 2400;
 static const float ENC_START_DEG = 0.0;
-static const int ENC_FLIP = -1;
+static const int ENC_FLIP = -1;     // If encoder is facing servo
 
 // Servo constants
 static const int SRV_START = 0;
@@ -120,7 +127,7 @@ static const float AIN_REF = 3.3;
 static const float AIN_VOLTAGE_DIV = 0.3333;
 
 // Globals
-static RotaryEncoder *encoder = nullptr;
+static Encoder enc(ENC_A_PIN, ENC_B_PIN);
 static Servo servo;
 static HX711 lca;
 static Adafruit_INA219 ina219;
@@ -130,11 +137,6 @@ static float log_buf[LOG_BUF_LENGTH][LOG_BUF_WIDTH];
  * Interrupt service routines (ISRs)
  */
 
-// Encoder interrupt service routine (pin change): check state
-void encoderISR() {
-  encoder->tick();
-}
-
 /******************************************************************************
  * Functions
  */
@@ -142,14 +144,11 @@ void encoderISR() {
 // Get the angle of the encoder in degrees (0 is starting position)
 float get_encoder_angle() {
   
-  int pos, dir;
+  int32_t pos;
   float deg = 0.0;
 
-  // Get position and direction (disable interrupts)
-  noInterrupts();
-  pos = encoder->getPosition();
-  dir = (int)encoder->getDirection();
-  interrupts();
+  // Get position
+  pos = enc.read();
 
   // Convert to degrees
   deg = (float)pos * (360.0 / ENC_STEPS_PER_ROTATION);
@@ -212,8 +211,6 @@ void setup() {
 
   // Configure pins
   pinMode(LED_PIN, OUTPUT);
-  pinMode(ENC_A_PIN, INPUT_PULLUP);
-  pinMode(ENC_B_PIN, INPUT_PULLUP);
 
   // Initialize our communication interface
   SerialUSB.begin(BAUD_RATE);
@@ -228,22 +225,13 @@ void setup() {
   servo.write(SRV_START);
   delay(2000);
 
-  // Configure encoder and set current position as 0
-  encoder = new RotaryEncoder(
-    ENC_A_PIN, 
-    ENC_B_PIN, 
-    RotaryEncoder::LatchMode::TWO03
-  );
-  encoder->setPosition(0);
+  // Set encoder current position as 0
+  enc.write(0);
 
   // Configure load cell amplifier
   lca.begin(LCA_DOUT_PIN, LCA_CLK_PIN);
   lca.set_scale(LCA_CALIBRATION_FACTOR);
   lca.tare();
-
-  // Configure encoder interrupts
-  attachInterrupt(digitalPinToInterrupt(ENC_A_PIN), encoderISR, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(ENC_B_PIN), encoderISR, CHANGE);
 
   // Configure current sensor
   if (!ina219.begin()) {
@@ -327,10 +315,18 @@ void loop() {
   servo.write(pos_end * SRV_MAX);
   for (int i = 0; i < num_readings; i++) {
 
+    // %%%TEST
+    // delay(12);
+    enc_val = 0.0;
+    lca_val = 0.0;
+    srv_vcc_voltage = 0.0;
+    srv_pot_voltage = 0.0;
+    current_ma = 0.0;
+
     // Get encoder value and flip for being mirrored
     enc_val = ENC_FLIP * get_encoder_angle();
 
-    // Get load cell amplifier value
+    // Get load cell amplifier value (induces ~12 ms delay)
     if (enable_force_reading) {
       lca_val = lca.get_units();
     } else {

@@ -1,7 +1,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
-# Run from main repo directory:
-#   python software/python/test_suite.py
+# Set up sequence:
+#   1. Adjust "Test settings" below to match your test setup
+#   2. Run "python ./software/python/move_servo.py 0.0" to set the servo to the initial position
+#   3. Cycle power on the Arduino to reset the encoder
+#   4. Run "python ./software/python/move_servo.py 0.5" to put the servo in the middle position
+#   5. Attach the load sensor hook to the servo/encoder coupler
+#   6. Run "python ./software/python/test_suite.py" to run the test suite
 
 import serial
 import os

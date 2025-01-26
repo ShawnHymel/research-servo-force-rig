@@ -43,7 +43,7 @@
 #include <Wire.h>
 
 #include "HX711.h"
-#include "RotaryEncoder.h"
+#include "Encoder.h"
 #include "Adafruit_INA219.h"
 
 /******************************************************************************
@@ -52,8 +52,8 @@
 
 // Pin definitions
 static const int LED_PIN = LED_BUILTIN;
-static const int ENC_A_PIN = 8;     // Green wire
-static const int ENC_B_PIN = 9;     // White wire
+#define ENC_A_PIN 8                 // Green wire
+#define ENC_B_PIN 9                 // White wire
 static const int SRV_PIN = 6;       // Servo signal
 static const int LCA_DOUT_PIN = 3;  // Yellow wire
 static const int LCA_CLK_PIN = 4;   // Green wire
@@ -64,7 +64,7 @@ static const int SRV_POT_PIN = A2;  // Blue wire
 static const unsigned int BAUD_RATE = 921600;
 
 // Encoder constants
-static const int ENC_STEPS_PER_ROTATION = 1200;
+static const int ENC_STEPS_PER_ROTATION = 2400;
 static const float ENC_START_DEG = 0.0;
 static const int ENC_FLIP = -1;
 
@@ -83,7 +83,7 @@ static const float AIN_REF = 3.3;
 static const float AIN_VOLTAGE_DIV = 0.3333;
 
 // Globals
-static RotaryEncoder *encoder = nullptr;
+Encoder enc(ENC_A_PIN, ENC_B_PIN);
 static Servo servo;
 static HX711 lca;
 static Adafruit_INA219 ina219;
@@ -92,11 +92,6 @@ static Adafruit_INA219 ina219;
  * Interrupt service routines (ISRs)
  */
 
-// Encoder interrupt service routine (pin change): check state
-void encoderISR() {
-  encoder->tick();
-}
-
 /******************************************************************************
  * Functions
  */
@@ -104,18 +99,16 @@ void encoderISR() {
 // Get the angle of the encoder in degrees (0 is starting position)
 float get_encoder_angle() {
   
-  int pos, dir;
+  int32_t pos;
   float deg = 0.0;
 
   // Get position and direction (disable interrupts)
-  noInterrupts();
-  pos = encoder->getPosition();
-  dir = (int)encoder->getDirection();
-  interrupts();
+  pos = enc.read();
 
   // Convert to degrees
   // pos = pos % ENC_STEPS_PER_ROTATION;
   // pos = pos >= 0 ? pos : pos + ENC_STEPS_PER_ROTATION;
+  // deg = (float)pos * (360.0 / ENC_STEPS_PER_ROTATION);
   deg = (float)pos * (360.0 / ENC_STEPS_PER_ROTATION);
 
   return deg;
@@ -129,8 +122,8 @@ void setup() {
 
   // Configure pins
   pinMode(LED_PIN, OUTPUT);
-  pinMode(ENC_A_PIN, INPUT_PULLUP);
-  pinMode(ENC_B_PIN, INPUT_PULLUP);
+  // pinMode(ENC_A_PIN, INPUT_PULLUP);
+  // pinMode(ENC_B_PIN, INPUT_PULLUP);
 
   // Initialize our communication interface
   SerialUSB.begin(BAUD_RATE);
@@ -145,22 +138,13 @@ void setup() {
   servo.write(SRV_START * SRV_MAX);
   delay(2000);
 
-  // Configure encoder and set current position as 0
-  encoder = new RotaryEncoder(
-    ENC_A_PIN, 
-    ENC_B_PIN, 
-    RotaryEncoder::LatchMode::TWO03
-  );
-  encoder->setPosition(0);
+  // Set encoder current position as 0
+  enc.write(0);
 
   // Configure load cell amplifier
   lca.begin(LCA_DOUT_PIN, LCA_CLK_PIN);
   lca.set_scale(LCA_CALIBRATION_FACTOR);
   lca.tare();
-
-  // Configure encoder interrupts
-  attachInterrupt(digitalPinToInterrupt(ENC_A_PIN), encoderISR, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(ENC_B_PIN), encoderISR, CHANGE);
 
   // Configure current sensor
   if (!ina219.begin()) {
