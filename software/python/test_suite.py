@@ -7,6 +7,7 @@
 #   4. Run "python ./software/python/move_servo.py 0.5" to put the servo in the middle position
 #   5. Attach the load sensor hook to the servo/encoder coupler
 #   6. Run "python ./software/python/test_suite.py" to run the test suite
+#   7. Swap hook positions and repeat steps 4-6 (uncomment out necessary POSITIONS below)
 
 import serial
 import os
@@ -15,19 +16,19 @@ import time
 from servo_sensor_logging import run_test, read_serial_data
 
 # Test settings
-DATA_PATH = "data/p1s/0_deg/100mm/6_0V"
-NUM_TESTS = 50             # Number of tests to run per position pair
+DATA_PATH = "data/p1s/0_deg/100mm/8_0V"
+NUM_TESTS = 3             # Number of tests to run per position pair
 WAIT_TIME_MS = 1000         # Time (ms) to wait at start position
-NUM_READINGS = 50           # Number of readings to take (let the servo cool down ~5 min between test batches!)
+NUM_READINGS = 50           # Number of readings to take (let the servo cool down ~1 min between test batches!)
 ENABLE_FORCE_READING = True # False: ~2 ms per reading, True: ~12.5 ms per reading
 COOLDOWN_POSITION = 0.333   # Position to move to between tests
 COOLDOWN_SEC = 2.0          # Time (sec) to wait between tests
-BATCH_COOLDOWN_SEC = 120.0  # Time (sec) to wait between test batches
+BATCH_COOLDOWN_SEC = 5.0  # Time (sec) to wait between test batches
 
 # Select test positions [start, end]. Comment out unused positions
-POSITIONS = [[0.0, 1.0], [0.0, 0.333], [0.333, 0.0]]  # Hook down
-# POSITIONS = [[1.0, 0.0], [0.333, 1.0], [1.0, 0.333]]  # Hook up
-# POSITIONS = [[0.333, 0.0]]  # Redo positions
+# POSITIONS = [[0.0, 1.0], [0.0, 0.333], [0.333, 0.0], [0.333, 1.0]] # Hook facing down
+# POSITIONS = [[1.0, 0.0], [1.0, 0.333]] # Hook facing up
+POSITIONS = [[0.0, 1.0]]  # Redo positions
 
 # Communication settings
 SERIAL_PORT = "COM9"
@@ -74,16 +75,17 @@ try:
                 )
 
                 # Move to cooldown position between tests
-                if idx < num_positions - 1:
-                    msg = f"{COOLDOWN_POSITION}, 0, {COOLDOWN_POSITION}, 0, 0"
-                    ser.write(msg.encode())
-                    time.sleep(COOLDOWN_SEC)
+                msg = f"{COOLDOWN_POSITION}, 0, {COOLDOWN_POSITION}, 0, 0"
+                ser.write(msg.encode())
+                time.sleep(COOLDOWN_SEC)
 
-                    # Flush serial buffer
-                    _ = read_serial_data(ser, TIMEOUT, TIMEOUT)
+                # Flush serial buffer
+                _ = read_serial_data(ser, TIMEOUT, TIMEOUT)
 
-        # Wait for the servo to cool down
-        time.sleep(BATCH_COOLDOWN_SEC)
+            # Let the servo cool on all but final test
+            if idx < num_positions - 1:
+                print(f"Waiting {BATCH_COOLDOWN_SEC} seconds before next test...")
+                time.sleep(BATCH_COOLDOWN_SEC)
 
 except serial.SerialException as e:
     print(f"Error opening or using the serial port: {e}")
