@@ -8,6 +8,9 @@
 #   5. Attach the load sensor hook to the servo/encoder coupler
 #   6. Run "python ./software/python/test_suite.py" to run the test suite
 #   7. Swap hook positions and repeat steps 4-6 (uncomment out necessary POSITIONS below)
+#
+# Notes:
+#   - 0 deg is the servo inline with the post and the axle up. 180 deg is the axle down.
 
 import serial
 import os
@@ -16,20 +19,20 @@ import time
 from servo_sensor_logging import run_test, read_serial_data
 
 # Test settings
-DATA_PATH = "data/p1s/90_deg/0mm/6_0V"
+DATA_PATH = "data/p1s/135_deg/0mm/6_0V"
 NUM_TESTS = 20              # Number of tests to run per position pair
 WAIT_TIME_MS = 1000         # Time (ms) to wait at start position
 NUM_READINGS = 50           # Number of readings to take (let the servo cool down ~1 min between test batches!)
 ENABLE_FORCE_READING = True # False: ~2 ms per reading, True: ~12.5 ms per reading
-COOLDOWN_POSITION = 0.8     # Position to move to between tests
+COOLDOWN_POSITION = 0.9     # Position to move to between tests
 COOLDOWN_SEC = 2.0          # Time (sec) to wait between tests
 BATCH_COOLDOWN_SEC = 60.0   # Time (sec) to wait between test batches
 
 # Select test positions [start, end]. Comment out unused positions
-POSITIONS = [[0.0, 1.0], [1.0, 0.0], [0.0, 0.7], [0.7, 0.0], [0.7, 1.0], [1.0, 0.7]] # All positions
+# POSITIONS = [[0.0, 1.0], [1.0, 0.0], [0.0, 0.7], [0.7, 0.0], [0.7, 1.0], [1.0, 0.7]] # All positions
 # POSITIONS = [[0.0, 1.0], [0.0, 0.7], [0.7, 0.0], [0.7, 1.0]] # Hook facing down
 # POSITIONS = [[1.0, 0.7], [1.0, 0.0]] # Hook facing up
-# POSITIONS = [[1.0, 0.0]]  # Redo positions
+POSITIONS = [[0.5, 1.0], [1.0, 0.5], [0.9, 1.0], [1.0, 0.9], [0.5, 0.9], [0.9, 0.5]]  # Redo positions
 
 # Communication settings
 SERIAL_PORT = "COM9"
