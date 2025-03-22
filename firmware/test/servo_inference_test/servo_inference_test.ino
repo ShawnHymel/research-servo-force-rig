@@ -260,9 +260,9 @@ void loop() {
     SerialUSB.print(")");
 #endif
 
-    SerialUSB.println();
+    SerialUSB.println(stall);
     delay(1);
   }
 
-  delay(1000);
+  delay(5000);
 }

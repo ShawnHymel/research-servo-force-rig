@@ -1,6 +1,6 @@
 #include "xgb_model.h"
 
-static double input_features[] = {9.1000e+01,  7.5455e-01, -2.0202e+00,  1.7000e+03};
+static double input_features[] = {1.3207e+03, -1.4167e+02,  5.3030e-01,  2.5253e-01};
 
 void setup() {
   SerialUSB.begin(9600);

@@ -20,7 +20,7 @@ docker build -t pytorch-gpu .
 
 Run the image to serve Jupyter Lab:
 
-Linux:
+Linux/macOS:
 
 ```sh
 docker run --gpus all -it --rm -v -p 127.0.0.1:8888:8888 -v "$(pwd)":/workspace pytorch-gpu
